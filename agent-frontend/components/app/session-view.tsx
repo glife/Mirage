@@ -18,43 +18,14 @@ const MotionBottom = motion.create('div');
 
 const BOTTOM_VIEW_MOTION_PROPS = {
   variants: {
-    visible: {
-      opacity: 1,
-      translateY: '0%',
-    },
-    hidden: {
-      opacity: 0,
-      translateY: '100%',
-    },
+    visible: { opacity: 1, y: 0 },
+    hidden: { opacity: 0, y: 20 },
   },
   initial: 'hidden',
   animate: 'visible',
   exit: 'hidden',
-  transition: {
-    duration: 0.3,
-    delay: 0.5,
-    ease: 'easeOut',
-  },
+  transition: { duration: 0.3, delay: 0.2, ease: 'easeOut' },
 };
-
-interface FadeProps {
-  top?: boolean;
-  bottom?: boolean;
-  className?: string;
-}
-
-export function Fade({ top = false, bottom = false, className }: FadeProps) {
-  return (
-    <div
-      className={cn(
-        'from-background pointer-events-none h-4 bg-linear-to-b to-transparent',
-        top && 'bg-linear-to-b',
-        bottom && 'bg-linear-to-t',
-        className
-      )}
-    />
-  );
-}
 
 interface SessionViewProps {
   appConfig: AppConfig;
@@ -87,37 +58,47 @@ export const SessionView = ({
   }, [messages]);
 
   return (
-    <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
-      {/* Chat Transcript */}
+    <section className="relative z-10 h-full w-full overflow-hidden" {...props}>
+      {/* 1. Underlying Tile Layout (Full Screen) */}
+      <TileLayout chatOpen={chatOpen} />
+
+      {/* 2. Chat Overlay (If open) */}
       <div
         className={cn(
-          'fixed inset-0 grid grid-cols-1 grid-rows-1',
-          !chatOpen && 'pointer-events-none'
+          'fixed inset-0 z-40 pointer-events-none transition-all duration-300',
+          chatOpen ? 'bg-black/60 backdrop-blur-sm' : 'bg-transparent'
+        )}
+      />
+
+      <div
+        className={cn(
+          'fixed inset-y-0 right-0 z-50 w-full max-w-md bg-zinc-950/90 shadow-2xl transition-transform duration-300 ease-in-out md:w-[400px]',
+          chatOpen ? 'translate-x-0' : 'translate-x-full'
         )}
       >
-        <Fade top className="absolute inset-x-4 top-0 h-40" />
-        <ScrollArea ref={scrollAreaRef} className="px-4 pt-40 pb-[150px] md:px-6 md:pb-[200px]">
+        {/* Chat Header */}
+        <div className="flex h-16 items-center border-b border-white/10 px-6">
+          <h2 className="text-lg font-medium text-white">Transcript</h2>
+        </div>
+
+        <ScrollArea ref={scrollAreaRef} className="h-[calc(100%-4rem)] p-6">
           <ChatTranscript
             hidden={!chatOpen}
             messages={messages}
-            className="mx-auto max-w-2xl space-y-3 transition-opacity duration-300 ease-out"
+            className="space-y-4"
           />
         </ScrollArea>
       </div>
 
-      {/* Tile Layout */}
-      <TileLayout chatOpen={chatOpen} />
-
-      {/* Bottom */}
+      {/* 3. Bottom Control Bar (Floating) */}
       <MotionBottom
         {...BOTTOM_VIEW_MOTION_PROPS}
-        className="fixed inset-x-3 bottom-0 z-50 md:inset-x-12"
+        className="fixed inset-x-0 bottom-8 z-50 flex justify-center pointer-events-none"
       >
-        {appConfig.isPreConnectBufferEnabled && (
-          <PreConnectMessage messages={messages} className="pb-4" />
-        )}
-        <div className="bg-background relative mx-auto max-w-2xl pb-3 md:pb-12">
-          <Fade bottom className="absolute inset-x-0 top-0 h-4 -translate-y-full" />
+        <div className="pointer-events-auto">
+          {appConfig.isPreConnectBufferEnabled && (
+            <PreConnectMessage messages={messages} className="mb-4" />
+          )}
           <AgentControlBar
             controls={controls}
             isConnected={session.isConnected}
