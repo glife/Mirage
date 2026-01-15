@@ -1,12 +1,10 @@
 import asyncio
+import os
 from dotenv import load_dotenv
 
 from livekit import agents, rtc
 from livekit.agents import AgentServer, AgentSession, Agent, room_io
-from livekit.plugins import google, noise_cancellation
-import mss
-import numpy as np
-from PIL import Image
+from livekit.plugins import google, noise_cancellation, bey
 
 load_dotenv(".env")
 
@@ -32,51 +30,6 @@ class Assistant(Agent):
 
 server = AgentServer()
 
-# ---------- SCREEN CAPTURE ----------
-async def capture_screen(source: rtc.VideoSource, width: int, height: int):
-    """Continuously capture screen frames and feed them to the video source."""
-    with mss.mss() as sct:
-        # Get the primary monitor
-        monitor = sct.monitors[1]
-        target_size = (width, height)
-        
-        while True:
-            try:
-                # Capture screenshot
-                screenshot = sct.grab(monitor)
-                
-                # Convert to numpy array (BGRA format)
-                img = np.array(screenshot)
-                
-                # Resize if needed
-                if img.shape[:2] != target_size[::-1]:
-                    pil_img = Image.fromarray(img)
-                    pil_img = pil_img.resize(target_size, Image.Resampling.LANCZOS)
-                    img = np.array(pil_img)
-                
-                # Convert BGRA to RGBA
-                img_rgba = np.zeros_like(img)
-                img_rgba[:, :, 0] = img[:, :, 2]  # R
-                img_rgba[:, :, 1] = img[:, :, 1]  # G
-                img_rgba[:, :, 2] = img[:, :, 0]  # B
-                img_rgba[:, :, 3] = img[:, :, 3]  # A
-                
-                # Create video frame
-                frame = rtc.VideoFrame(
-                    width, height,
-                    rtc.VideoBufferType.RGBA,
-                    img_rgba.tobytes()
-                )
-                
-                # Capture frame
-                source.capture_frame(frame)
-                
-                # Target 15 FPS
-                await asyncio.sleep(1 / 15)
-            except Exception as e:
-                print(f"Error capturing screen: {e}")
-                await asyncio.sleep(1 / 15)
-
 
 # ---------- LIVEKIT AGENT ----------
 @server.rtc_session()
@@ -85,23 +38,8 @@ async def my_agent(ctx: agents.JobContext):
         llm=google.realtime.RealtimeModel(voice="Puck")
     )
 
-    WIDTH = 1920
-    HEIGHT = 1080
-
-    video_source = rtc.VideoSource(WIDTH, HEIGHT)
-    video_track = rtc.LocalVideoTrack.create_video_track(
-        "screen-share", video_source
-    )
-
-    publish_options = rtc.TrackPublishOptions(
-        source=rtc.TrackSource.SOURCE_CAMERA,
-        simulcast=True,
-        video_encoding=rtc.VideoEncoding(
-            max_framerate=15,
-            max_bitrate=1_500_000,
-        ),
-        video_codec=rtc.VideoCodec.H264,
-    )
+    # Create and start the Beyond Presence avatar session
+    avatar_session = bey.AvatarSession(avatar_id=os.environ["BEY_AVATAR_ID"])
 
     # ✅ CONNECT ROOM FIRST
     await session.start(
@@ -119,23 +57,15 @@ async def my_agent(ctx: agents.JobContext):
         ),
     )
 
-    # ✅ Publish AFTER connect
-    await ctx.room.local_participant.publish_track(
-        video_track, publish_options
-    )
-
-    # Start screen capture in background
-    capture_task = asyncio.create_task(capture_screen(video_source, WIDTH, HEIGHT))
+    # ✅ Start the avatar session - this will make the avatar join the room
+    await avatar_session.start(room=ctx.room, agent_session=session)
 
     await session.generate_reply(
         instructions="Greet the user and offer your assistance. You should start by speaking in English."
     )
 
-    # Keep the capture task running
-    try:
-        await capture_task
-    except asyncio.CancelledError:
-        pass
+    # Keep the session running
+    await asyncio.Event().wait()
 
 
 if __name__ == "__main__":
