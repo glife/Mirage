@@ -123,4 +123,8 @@ async def my_agent(ctx: agents.JobContext):
 
 
 if __name__ == "__main__":
+    import sys
+    # Ensure we're running with the 'start' command or default to it
+    if len(sys.argv) == 1:
+        sys.argv.append("start")
     agents.cli.run_app(server)

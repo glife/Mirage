@@ -10,15 +10,55 @@ import {
   useVoiceAssistant,
 } from '@livekit/components-react';
 import { cn } from '@/lib/utils';
-import { OrbVisualizer } from './orb-visualizer';
+import { usePersona } from '@/components/app/persona-context';
+
 
 const MotionContainer = motion.create('div');
 
 const ANIMATION_TRANSITION = {
-  type: 'spring',
+  type: 'spring' as const,
   stiffness: 675,
   damping: 75,
   mass: 1,
+};
+
+const classNames = {
+  // GRID
+  // 2 Columns x 3 Rows
+  grid: [
+    'h-full w-full',
+    'grid gap-x-2 place-content-center',
+    'grid-cols-[1fr_1fr] grid-rows-[90px_1fr_90px]',
+  ],
+  // Agent
+  // chatOpen: true,
+  // hasSecondTile: true
+  // layout: Column 1 / Row 1
+  // align: x-end y-center
+  agentChatOpenWithSecondTile: ['col-start-1 row-start-1', 'self-center justify-self-end'],
+  // Agent
+  // chatOpen: true,
+  // hasSecondTile: false
+  // layout: Column 1 / Row 1 / Column-Span 2
+  // align: x-center y-center
+  agentChatOpenWithoutSecondTile: ['col-start-1 row-start-1', 'col-span-2'],
+  // Agent
+  // chatOpen: false
+  // layout: Column 1 / Row 1 / Column-Span 2 / Row-Span 3
+  // align: x-center y-center
+  agentChatClosed: ['col-start-1 row-start-1', 'col-span-2 row-span-3'],
+  // Second tile
+  // chatOpen: true,
+  // hasSecondTile: true
+  // layout: Column 2 / Row 1
+  // align: x-start y-center
+  secondTileChatOpen: ['col-start-2 row-start-1', 'self-center justify-self-start'],
+  // Second tile
+  // chatOpen: false,
+  // hasSecondTile: false
+  // layout: Column 2 / Row 2
+  // align: x-end y-end
+  secondTileChatClosed: ['col-start-2 row-start-3', 'place-content-end'],
 };
 
 export function useLocalTrackRef(source: Track.Source) {
@@ -32,88 +72,174 @@ export function useLocalTrackRef(source: Track.Source) {
 }
 
 interface TileLayoutProps {
-  chatOpen?: boolean;
+  chatOpen: boolean;
 }
 
-export function TileLayout({ chatOpen = false }: TileLayoutProps) {
+export function TileLayout({ chatOpen }: TileLayoutProps) {
   const {
     state: agentState,
     audioTrack: agentAudioTrack,
     videoTrack: agentVideoTrack,
   } = useVoiceAssistant();
+  const { currentPersona } = usePersona();
   const [screenShareTrack] = useTracks([Track.Source.ScreenShare]);
   const cameraTrack: TrackReference | undefined = useLocalTrackRef(Track.Source.Camera);
 
   const isCameraEnabled = cameraTrack && !cameraTrack.publication.isMuted;
   const isScreenShareEnabled = screenShareTrack && !screenShareTrack.publication.isMuted;
-  const isAvatar = agentVideoTrack !== undefined;
+  const hasSecondTile = isCameraEnabled || isScreenShareEnabled;
+
+  const animationDelay = chatOpen ? 0 : 0.15;
+  const isAvatar = false; // agentVideoTrack !== undefined && agentVideoTrack.source === Track.Source.Camera;
+  const videoWidth = agentVideoTrack?.publication.dimensions?.width ?? 0;
+  const videoHeight = agentVideoTrack?.publication.dimensions?.height ?? 0;
 
   return (
-    <div className="absolute inset-0 h-full w-full overflow-hidden bg-black">
-      {/* 1. LAYER: AGENT (Background / Main Spotlight) */}
-      <div className="absolute inset-0 flex h-full w-full items-center justify-center">
-        <AnimatePresence mode="popLayout">
-          {/* A. If Agent has VIDEO */}
-          {isAvatar && agentVideoTrack && (
-            <MotionContainer
-              key="agent-video"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="h-full w-full object-cover"
-            >
-              <VideoTrack
-                trackRef={agentVideoTrack}
-                className="h-full w-full object-cover"
-              />
-            </MotionContainer>
-          )}
+    <div className="pointer-events-none fixed inset-x-0 top-8 bottom-32 z-50 md:top-12 md:bottom-40">
+      <div className="relative mx-auto h-full max-w-2xl px-4 md:px-0">
+        <div className={cn(classNames.grid)}>
+          {/* Agent */}
+          <div
+            className={cn([
+              'grid',
+              !chatOpen && classNames.agentChatClosed,
+              chatOpen && hasSecondTile && classNames.agentChatOpenWithSecondTile,
+              chatOpen && !hasSecondTile && classNames.agentChatOpenWithoutSecondTile,
+            ])}
+          >
+            <AnimatePresence mode="popLayout">
+              {!isAvatar && (
+                // Audio Agent
+                <MotionContainer
+                  key="agent"
+                  layoutId="agent"
+                  initial={{
+                    opacity: 0,
+                  }}
+                  animate={{
+                    opacity: 1,
+                  }}
+                  transition={{
+                    ...ANIMATION_TRANSITION,
+                    delay: animationDelay,
+                  }}
+                  className={cn(
+                    'relative bg-background rounded-md border border-transparent transition-[border,drop-shadow,border-radius] overflow-hidden',
+                    'h-full w-full',
+                    chatOpen && 'border-input/50 drop-shadow-lg/10 delay-200',
+                    // Circular Avatar styling for text mode
+                    chatOpen && !hasSecondTile && 'mx-auto aspect-square h-[90px] w-[90px] rounded-full'
+                  )}
+                >
+                  {/* Placeholder Image */}
+                  <img
+                    src={currentPersona.image}
+                    alt="Agent Placeholder"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
 
-          {/* B. If Agent is AUDIO ONLY (Visualizer) */}
-          {/* B. If Agent is AUDIO ONLY (Visualizer) */}
-          {!isAvatar && (
-            <MotionContainer
-              key="agent-visualizer"
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className="flex h-full w-full items-center justify-center"
-            >
-              <div className="flex flex-col items-center gap-12">
-                <OrbVisualizer
-                  state={agentState}
-                  trackRef={agentAudioTrack}
-                  className="scale-150"
-                />
-                <p className="font-mono text-sm font-medium tracking-widest text-white/50 uppercase">
-                  {agentState}
-                </p>
-              </div>
-            </MotionContainer>
-          )}
-        </AnimatePresence>
-      </div>
 
-      {/* 2. LAYER: USER (Foreground / PiP) */}
-      <div className="absolute top-6 right-6 z-20 w-48 overflow-hidden rounded-2xl shadow-2xl ring-1 ring-white/10 transition-all hover:ring-white/20 md:w-64">
-        <AnimatePresence mode="popLayout">
-          {((cameraTrack && isCameraEnabled) || (screenShareTrack && isScreenShareEnabled)) && (
-            <MotionContainer
-              key="user-pip"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 20 }}
-              transition={ANIMATION_TRANSITION}
-              className="relative aspect-video w-full bg-zinc-900"
-            >
-              <VideoTrack
-                trackRef={screenShareTrack || cameraTrack}
-                className="h-full w-full object-cover mirror-x"
-              />
-            </MotionContainer>
-          )}
-        </AnimatePresence>
+
+                  // ... (in the component)
+
+                  {/* Visualizer Removed - Moved to Control Bar */}
+                </MotionContainer>
+              )}
+
+              {isAvatar && (
+                // Avatar Agent
+                <MotionContainer
+                  key="avatar"
+                  layoutId="avatar"
+                  initial={{
+                    scale: 1,
+                    opacity: 1,
+                    maskImage:
+                      'radial-gradient(circle, rgba(0, 0, 0, 1) 0, rgba(0, 0, 0, 1) 20px, transparent 20px)',
+                    filter: 'blur(20px)',
+                  }}
+                  animate={{
+                    maskImage:
+                      'radial-gradient(circle, rgba(0, 0, 0, 1) 0, rgba(0, 0, 0, 1) 500px, transparent 500px)',
+                    filter: 'blur(0px)',
+                    borderRadius: chatOpen ? 6 : 12,
+                  }}
+                  transition={{
+                    ...ANIMATION_TRANSITION,
+                    delay: animationDelay,
+                    maskImage: {
+                      duration: 1,
+                    },
+                    filter: {
+                      duration: 1,
+                    },
+                  }}
+                  className={cn(
+                    'relative overflow-hidden bg-black drop-shadow-xl/80',
+                    chatOpen ? 'h-[90px]' : 'h-auto w-full'
+                  )}
+                >
+                  <img
+                    src={currentPersona.image}
+                    alt="Agent Placeholder"
+                    className="absolute inset-0 h-full w-full object-cover -z-10 opacity-60"
+                  />
+                  <VideoTrack
+                    width={videoWidth}
+                    height={videoHeight}
+                    trackRef={agentVideoTrack}
+                    className={cn(chatOpen && 'size-[90px] object-cover')}
+                  />
+                </MotionContainer>
+              )}
+            </AnimatePresence>
+          </div>
+
+          <div
+            className={cn([
+              'grid',
+              chatOpen && classNames.secondTileChatOpen,
+              !chatOpen && classNames.secondTileChatClosed,
+            ])}
+          >
+            {/* Camera & Screen Share */}
+            <AnimatePresence>
+              {((cameraTrack && isCameraEnabled) || (screenShareTrack && isScreenShareEnabled)) && (
+                <MotionContainer
+                  key="camera"
+                  layout="position"
+                  layoutId="camera"
+                  initial={{
+                    opacity: 0,
+                    scale: 0,
+                  }}
+                  animate={{
+                    opacity: 1,
+                    scale: 1,
+                  }}
+                  exit={{
+                    opacity: 0,
+                    scale: 0,
+                  }}
+                  transition={{
+                    ...ANIMATION_TRANSITION,
+                    delay: animationDelay,
+                  }}
+                  className="drop-shadow-lg/20"
+                >
+                  <VideoTrack
+                    trackRef={cameraTrack || screenShareTrack}
+                    width={(cameraTrack || screenShareTrack)?.publication.dimensions?.width ?? 0}
+                    height={(cameraTrack || screenShareTrack)?.publication.dimensions?.height ?? 0}
+                    className="bg-muted aspect-square w-[90px] rounded-md object-cover"
+                  />
+                </MotionContainer>
+              )}
+            </AnimatePresence>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
+

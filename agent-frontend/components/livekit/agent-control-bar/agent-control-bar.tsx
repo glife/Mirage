@@ -12,6 +12,9 @@ import { ChatInput } from './chat-input';
 import { UseInputControlsProps, useInputControls } from './hooks/use-input-controls';
 import { usePublishPermissions } from './hooks/use-publish-permissions';
 import { TrackSelector } from './track-selector';
+import { AudioVisualizerBar } from '@/components/app/audio-visualizer-bar';
+import { useVoiceAssistant } from '@livekit/components-react';
+import { usePersona } from '@/components/app/persona-context';
 
 export interface ControlBarControls {
   leave?: boolean;
@@ -42,6 +45,8 @@ export function AgentControlBar({
   const participants = useRemoteParticipants();
   const [chatOpen, setChatOpen] = useState(false);
   const publishPermissions = usePublishPermissions();
+  const { audioTrack: agentAudioTrack } = useVoiceAssistant();
+  const { currentPersona } = usePersona();
   const {
     micTrackRef,
     cameraToggle,
@@ -106,6 +111,12 @@ export function AgentControlBar({
               className="h-12 w-12 rounded-full border-none bg-white/5 hover:bg-white/10"
             />
           )}
+
+          {/* Audio Visualizer */}
+          <AudioVisualizerBar
+            trackRef={agentAudioTrack}
+            className="mx-2 hidden md:block self-center"
+          />
 
           {/* Toggle Camera */}
           {visibleControls.camera && (
