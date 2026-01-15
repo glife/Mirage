@@ -1,8 +1,15 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { motion } from 'motion/react';
-import { useSessionContext, useSessionMessages } from '@livekit/components-react';
+import {
+  useSessionContext,
+  useSessionMessages,
+  useLocalParticipant,
+  useTrackTranscription,
+  TrackReferenceOrPlaceholder,
+} from '@livekit/components-react';
+import { Track, Participant } from 'livekit-client';
 import type { AppConfig } from '@/app-config';
 import { ChatTranscript } from '@/components/app/chat-transcript';
 import { PreConnectMessage } from '@/components/app/preconnect-message';
@@ -13,6 +20,7 @@ import {
 } from '@/components/livekit/agent-control-bar/agent-control-bar';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '../livekit/scroll-area/scroll-area';
+import { usePersona } from '@/components/app/persona-context';
 
 const MotionBottom = motion.create('div');
 
@@ -69,6 +77,34 @@ export const SessionView = ({
   const [chatOpen, setChatOpen] = useState(false);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
+  const { localParticipant } = useLocalParticipant();
+  const { currentPersona } = usePersona();
+  const [transcription, setTranscription] = useState('');
+
+  const localMicrophoneTrack = useMemo(() => ({
+    source: Track.Source.Microphone,
+    participant: localParticipant,
+  }), [localParticipant]);
+
+  const { segments } = useTrackTranscription(localMicrophoneTrack);
+
+  useEffect(() => {
+    if (segments.length > 0) {
+      const lastSegment = segments[segments.length - 1];
+      if (!lastSegment.final) {
+        setTranscription(lastSegment.text);
+      } else {
+        // Option: If we want it to clear or stick until next message.
+        // For now, let's keep it visible until new speech starts or maybe clear it?
+        // Actually, if it's final, the backend SHOULD have received it and hopefully sent a chat message back?
+        // If not, we might want to just keep showing it.
+        // Let's just show the LATEST text regardless of finality for now to ensure visibility.
+        setTranscription(lastSegment.text);
+      }
+    }
+  }, [segments]);
+
+
   const controls: ControlBarControls = {
     leave: true,
     microphone: true,
@@ -78,16 +114,23 @@ export const SessionView = ({
   };
 
   useEffect(() => {
-    const lastMessage = messages.at(-1);
-    const lastMessageIsLocal = lastMessage?.from?.isLocal === true;
-
-    if (scrollAreaRef.current && lastMessageIsLocal) {
+    if (scrollAreaRef.current) {
       scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
     }
   }, [messages]);
 
   return (
-    <section className="bg-background relative z-10 h-full w-full overflow-hidden" {...props}>
+    <section className="bg-transparent relative z-10 h-full w-full overflow-hidden" {...props}>
+      {/* Immersive Background */}
+      <div className="fixed inset-0 -z-10 h-full w-full bg-black">
+        <img
+          src={currentPersona.image}
+          alt="immersive-bg"
+          className="h-full w-full object-cover opacity-50 blur-[100px] hover:blur-[80px] transition-all duration-1000 scale-110 brightness-90 contrast-125 saturate-200"
+        />
+        <div className="absolute inset-0 bg-black/10" />
+      </div>
+
       {/* Chat Transcript */}
       <div
         className={cn(
@@ -100,6 +143,7 @@ export const SessionView = ({
           <ChatTranscript
             hidden={!chatOpen}
             messages={messages}
+            lastLocalMessage={transcription}
             className="mx-auto max-w-2xl space-y-3 transition-opacity duration-300 ease-out"
           />
         </ScrollArea>

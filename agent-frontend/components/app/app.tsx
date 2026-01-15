@@ -12,6 +12,7 @@ import type { AppConfig } from '@/app-config';
 import { ViewController } from '@/components/app/view-controller';
 import { Toaster } from '@/components/livekit/toaster';
 import { useAgentErrors } from '@/hooks/useAgentErrors';
+import { PersonaProvider } from '@/components/app/persona-context';
 import { useDebugMode } from '@/hooks/useDebug';
 import { getSandboxTokenSource } from '@/lib/utils';
 
@@ -42,13 +43,15 @@ export function App({ appConfig }: AppProps) {
 
   return (
     <SessionProvider session={session}>
-      <AppSetup />
-      <main className="grid h-svh grid-cols-1 place-content-center">
-        <ViewController appConfig={appConfig} />
-      </main>
-      <StartAudio label="Start Audio" />
-      <RoomAudioRenderer />
-      <Toaster />
+      <PersonaProvider>
+        <AppSetup />
+        <main className="grid h-svh grid-cols-1 place-content-center">
+          <ViewController appConfig={appConfig} />
+        </main>
+        <StartAudio label="Start Audio" />
+        <RoomAudioRenderer />
+        <Toaster />
+      </PersonaProvider>
     </SessionProvider>
   );
 }

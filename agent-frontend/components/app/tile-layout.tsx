@@ -10,11 +10,13 @@ import {
   useVoiceAssistant,
 } from '@livekit/components-react';
 import { cn } from '@/lib/utils';
+import { usePersona } from '@/components/app/persona-context';
+
 
 const MotionContainer = motion.create('div');
 
 const ANIMATION_TRANSITION = {
-  type: 'spring',
+  type: 'spring' as const,
   stiffness: 675,
   damping: 75,
   mass: 1,
@@ -39,12 +41,12 @@ const classNames = {
   // hasSecondTile: false
   // layout: Column 1 / Row 1 / Column-Span 2
   // align: x-center y-center
-  agentChatOpenWithoutSecondTile: ['col-start-1 row-start-1', 'col-span-2', 'place-content-center'],
+  agentChatOpenWithoutSecondTile: ['col-start-1 row-start-1', 'col-span-2'],
   // Agent
   // chatOpen: false
   // layout: Column 1 / Row 1 / Column-Span 2 / Row-Span 3
   // align: x-center y-center
-  agentChatClosed: ['col-start-1 row-start-1', 'col-span-2 row-span-3', 'place-content-center'],
+  agentChatClosed: ['col-start-1 row-start-1', 'col-span-2 row-span-3'],
   // Second tile
   // chatOpen: true,
   // hasSecondTile: true
@@ -79,6 +81,7 @@ export function TileLayout({ chatOpen }: TileLayoutProps) {
     audioTrack: agentAudioTrack,
     videoTrack: agentVideoTrack,
   } = useVoiceAssistant();
+  const { currentPersona } = usePersona();
   const [screenShareTrack] = useTracks([Track.Source.ScreenShare]);
   const cameraTrack: TrackReference | undefined = useLocalTrackRef(Track.Source.Camera);
 
@@ -87,7 +90,7 @@ export function TileLayout({ chatOpen }: TileLayoutProps) {
   const hasSecondTile = isCameraEnabled || isScreenShareEnabled;
 
   const animationDelay = chatOpen ? 0 : 0.15;
-  const isAvatar = agentVideoTrack !== undefined;
+  const isAvatar = false; // agentVideoTrack !== undefined && agentVideoTrack.source === Track.Source.Camera;
   const videoWidth = agentVideoTrack?.publication.dimensions?.width ?? 0;
   const videoHeight = agentVideoTrack?.publication.dimensions?.height ?? 0;
 
@@ -112,36 +115,34 @@ export function TileLayout({ chatOpen }: TileLayoutProps) {
                   layoutId="agent"
                   initial={{
                     opacity: 0,
-                    scale: 0,
                   }}
                   animate={{
                     opacity: 1,
-                    scale: chatOpen ? 1 : 5,
                   }}
                   transition={{
                     ...ANIMATION_TRANSITION,
                     delay: animationDelay,
                   }}
                   className={cn(
-                    'bg-background aspect-square h-[90px] rounded-md border border-transparent transition-[border,drop-shadow]',
-                    chatOpen && 'border-input/50 drop-shadow-lg/10 delay-200'
+                    'relative bg-background rounded-md border border-transparent transition-[border,drop-shadow,border-radius] overflow-hidden',
+                    'h-full w-full',
+                    chatOpen && 'border-input/50 drop-shadow-lg/10 delay-200',
+                    // Circular Avatar styling for text mode
+                    chatOpen && !hasSecondTile && 'mx-auto aspect-square h-[90px] w-[90px] rounded-full'
                   )}
                 >
-                  <BarVisualizer
-                    barCount={5}
-                    state={agentState}
-                    options={{ minHeight: 5 }}
-                    trackRef={agentAudioTrack}
-                    className={cn('flex h-full items-center justify-center gap-1')}
-                  >
-                    <span
-                      className={cn([
-                        'bg-muted min-h-2.5 w-2.5 rounded-full',
-                        'origin-center transition-colors duration-250 ease-linear',
-                        'data-[lk-highlighted=true]:bg-foreground data-[lk-muted=true]:bg-muted',
-                      ])}
-                    />
-                  </BarVisualizer>
+                  {/* Placeholder Image */}
+                  <img
+                    src={currentPersona.image}
+                    alt="Agent Placeholder"
+                    className="absolute inset-0 h-full w-full object-cover"
+                  />
+
+
+
+                  // ... (in the component)
+
+                  {/* Visualizer Removed - Moved to Control Bar */}
                 </MotionContainer>
               )}
 
@@ -174,10 +175,15 @@ export function TileLayout({ chatOpen }: TileLayoutProps) {
                     },
                   }}
                   className={cn(
-                    'overflow-hidden bg-black drop-shadow-xl/80',
+                    'relative overflow-hidden bg-black drop-shadow-xl/80',
                     chatOpen ? 'h-[90px]' : 'h-auto w-full'
                   )}
                 >
+                  <img
+                    src={currentPersona.image}
+                    alt="Agent Placeholder"
+                    className="absolute inset-0 h-full w-full object-cover -z-10 opacity-60"
+                  />
                   <VideoTrack
                     width={videoWidth}
                     height={videoHeight}

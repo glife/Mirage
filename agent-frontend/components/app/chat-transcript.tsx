@@ -51,11 +51,13 @@ const MESSAGE_MOTION_PROPS = {
 interface ChatTranscriptProps {
   hidden?: boolean;
   messages?: ReceivedMessage[];
+  lastLocalMessage?: string;
 }
 
 export function ChatTranscript({
   hidden = false,
   messages = [],
+  lastLocalMessage,
   ...props
 }: ChatTranscriptProps & Omit<HTMLMotionProps<'div'>, 'ref'>) {
   return (
@@ -81,6 +83,17 @@ export function ChatTranscript({
               />
             );
           })}
+          {lastLocalMessage && (
+            <MotionChatEntry
+              key="local-transcript"
+              locale={navigator?.language ?? 'en-US'}
+              timestamp={Date.now()}
+              message={lastLocalMessage}
+              messageOrigin="local"
+              hasBeenEdited={false}
+              {...MESSAGE_MOTION_PROPS}
+            />
+          )}
         </MotionContainer>
       )}
     </AnimatePresence>

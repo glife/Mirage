@@ -42,6 +42,7 @@ export function useInputControls({
 
   const screenShareToggle = useTrackToggle({
     source: Track.Source.ScreenShare,
+    initialState: false,
     onDeviceError: (error) => onDeviceError?.({ source: Track.Source.ScreenShare, error }),
   });
 
